@@ -1,0 +1,820 @@
+---
+title: 'Karthik Srinivasan, Kineret Stanley, Kevin Fu: W271 Group Lab 3'
+subtitle: 'Due Sunday 8 August 2021 11:59pm'
+geometry: margin=1in
+output:
+  pdf_document: default
+  number_sections: yes
+  toc: yes
+fontsize: 11pt
+---
+
+
+```{r setup, echo=FALSE, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+```{r load packages, message = FALSE, warning=FALSE, results = FALSE, include = FALSE} 
+xfun::pkg_attach(c("car", "dplyr", "Hmisc", "skimr", "ggplot2", "stargazer", "GGally", "tidyr", "tsibble", "knitr", "mcprofile","ggthemes","MASS","astsa", "gridExtra","binom", "tidyverse","nnet" ,"readr", "plm","fable", "fpp3", "feasts", "lubridate", "ggcorrplot", "skimr", "grid", "directlabels", "caret","e1071", "EnvStats", "gplots", "patchwork", "usmap", "lmtest", "kableExtra"), install = TRUE)
+
+# set theme for plots
+theme_set(theme_bw())
+# set default output digits:
+options(digits = 4)
+```
+
+# U.S. traffic fatalities: 1980-2004
+
+In this lab, you are asked to answer the question **"Do changes in traffic laws affect traffic fatalities?"**  To do so, you will conduct the tasks specified below using the data set *driving.Rdata*, which includes 25 years of data that cover changes in various state drunk driving, seat belt, and speed limit laws. 
+
+Specifically, this data set contains data for the 48 continental U.S. states from 1980 through 2004. Various driving laws are indicated in the data set, such as the alcohol level at which drivers are considered legally intoxicated. There are also indicators for “per se” laws—where licenses can be revoked without a trial—and seat belt laws. A few economic and demographic variables are also included. The description of the each of the variables in the dataset is come with the dataset.
+
+\section{Q1}
+
+1. (30%) Load the data. Provide a description of the basic structure of the dataset, as we have done throughout the semester. Conduct a very thorough EDA, which should include both graphical and tabular techniques, on the dataset, including both the dependent variable *totfatrte* and the potential explanatory variables. You need to write a detailed narrative of your observations of your EDA. *Reminder: giving an "output dump" (i.e. providing a bunch of graphs and tables without description and hoping your audience will interpret them) will receive a zero in this exercise.*
+
+```{r, message=FALSE, warning=FALSE}
+load("driving.RData")
+df <- data
+
+# check to see if it's balanced
+table(df$year)
+colnames(df)
+```
+
+```{r robust standard error}
+robust_se <- function(mod, type = 'HC3') { 
+  sqrt(diag(vcovHC(mod, method = "arellano", type)))
+}
+#arellano recommended for both heteroskedasticity and serial correlation.
+```
+
+## Description of Dataset
+
+The dataset comprises of fatalities recorded from the continental 48 states between 1980 and 2004 with no missing or NA values in any of the columns. In particular, the total fatality rate is calculated per 100,000 in each and every US state. The dataset consists of 1200 observations with 56 variables, defined in detail in [Appendix A](#AppendixA) and [Appendix B](#AppendixB). 
+
+The data is constructed in a panel format, with each panel consisting of data from the 48 states for each year between 1980 and 2004. In all, this results in 25 year panels, which result in the 1200 data points (25*48). The panel is balanced, and the 56 variables can be divided into the following groups:
+
+
+### Laws per state
+
+Various traffic laws such as blood alcohol concentrations (bac08, bac10), Per Se laws (perse), zero tolerance laws (zerotol), speed limit laws (sl60, sl65, ...) and seat-belt laws (sbprim, sbsecon) are recorded for each state. These variables take up a value of 0 or 1, depending on whether the law was enforced in any given year. The years in which the laws were introduced results in a fractional value being recorded between 0 and 1. For example, a bac08 law (Blood Alcohol Concentration limit of 0.08%) that changed in March will get assigned 0.25 for that year while receiving 0 (for previous years) and 1 (for future years). The laws present in the dataset are defined in [Appendix A](#AppendixA).
+
+### Fatality Statistics per state
+
+The dataset also records the fatalities as a result of drunk driving. The total fatality rate is measured as the number of fatalities per 100,000 of the population in each state. In addition to the total fatality rate, the dataset also contains information on the night and weekend fatality rates, presumably due to a higher likelihood of drunk driving during this periods. The aforementioned fatality rates are also measured per 100 million miles of driving. The variables associated with the fatality rates are given by totfatrte, totfatpvm, wkndfatrte, nghtfatrte...
+
+### Demographics
+
+The rest of the variables record the population statistics and the driving behavior (per capita mileage). In addition to the raw population statistics, the dataset also records the unemployment rate over the years alongwith the percentage of population between 14 and 24 years.
+
+### Dummy Variables
+
+The dataset also contains a on-hot encoded dummy variable for each of years from 1980 to 2004. This is provided as a form of convenience and does not add any value to the overall dataset.
+
+Please refer to [Appendix C](#AppendixC) for some of the lengthier code blocks that drive the analyses and charts below.
+
+```{r State names, echo = FALSE}
+us_states <- data.frame(state = unique(df$state), us_state = c('AL','AR','AZ','CA','CO','CT', 'DE','FL','GA', 'IA','ID','IL','IN','KS','KY','LA','MA','MD',
+               'ME','MI','MN','MO','MS','MT','NC','ND','NE',
+               'NH','NJ','NM','NV','NY','OH','OK','OR','PA',
+               'RI','SC','SD','TN','TX','UT','VA','VT','WA',
+               'WI','WV','WY'))
+```
+
+
+```{r, message=FALSE, warning=FALSE,out.width="50%", fig.align="center"}
+# drop unused features and edit / reformat others
+columns_to_keep <- c('totfatrte', 'year', 'state', 'bac08', 'bac10', 
+'perse', 'sbprim', 'sbsecon', 'sl70plus', 'gdl', 'perc14_24', 'unem', 'vehicmilespc')
+numeric_columns <- c('totfatrte', 'perc14_24', 'unem', 'vehicmilespc')
+round_up_columns <- c( 'bac08', 'bac10', 'perse', 'sl70plus', 'gdl')
+factor_columns <- c(c('state','sbprim', 'sbsecon', 'us_state'), round_up_columns)
+df <- df %>% 
+  # keep subset of columns
+  dplyr::select(columns_to_keep) %>%
+  # add in US state names
+  merge(y = us_states, by.x = "state", by.y = "state") %>%
+  # for partial years when law changed round up
+  mutate(across(round_up_columns, round)) %>%
+  mutate_each(funs(as.factor), factor_columns) %>%
+  mutate_each(funs(as.numeric), numeric_columns)
+```
+
+After all the data manipulations above, we get the following cleansed and reduced form of our dataset.
+
+```{r, message=FALSE, warning=FALSE,out.width="50%", fig.align="center"}
+knitr::kable(head(df[,1:13],5), caption = "Cleaned and Reduced Dataset", digits = 1) %>% 
+  kable_styling(latex_options="scale_down")
+```
+
+We also visualize the total fatality rates at the end of 1981 and compare them at the endof 2004. We observe that the overall fatality rates across the states have reduced, and that the states that had high fatality rates in 1981 continue to be so at the end of 2004.
+
+```{r Map Plots, echo = FALSE, out.width="85%", fig.align="center"}
+
+#map of US with average fatality rates at t0 and tn
+
+# average by year
+t0_fatrte <- df%>% 
+        dplyr::select(us_state, totfatrte, year) %>%
+        group_by(us_state) %>% 
+        rename(state = us_state) %>%
+        filter(year == min(year)) %>%
+        summarise(totfatrte_avg = mean(totfatrte)) 
+
+tn_fatrte <- df%>% 
+        dplyr::select(us_state, totfatrte, year) %>%
+        group_by(us_state) %>% 
+        rename(state = us_state) %>%
+        filter(year == max(year)) %>%
+        summarise(totfatrte_avg = mean(totfatrte)) 
+
+#maps 
+map_t0 <- plot_usmap(data = t0_fatrte,  
+                     exclude = c("HI", "AK"), values =  "totfatrte_avg",
+                     color = "red") + 
+  labs(title = "Average Fatality Rate - 1980") + 
+  scale_fill_continuous(low = "white", high = "red", limits =c(0,70)) + 
+              theme(legend.position = "top",
+                    legend.title=element_blank())
+
+map_tn <- plot_usmap(data = tn_fatrte, exclude = c("HI", "AK"),
+            values = "totfatrte_avg", color = "red") + 
+            labs(title = "Average Fatality Rate - 2004") +
+            scale_fill_continuous(low = "white", 
+                                  high = "red",
+                                  limits =c(0,70)) + 
+              theme(legend.position = "top",
+                    legend.title=element_blank())
+grid.arrange(map_t0, map_tn, ncol = 2)
+
+```
+
+
+### Dependent and Independent Variables
+
+We would like to predict the total fatality rate (*totfatrte*) based on the various state laws (speed limits, drinking laws, and seat belt laws), driving behavior (vehicmilespc), and state demographics.
+
+**Continuous Variables**
+
+* We start by examining the distributions of the continuous variables (totfatrte, unem, perc14_24, vehicmilespc). From the distributions and skewness test below, we find that the variables `unem` variable is strongly skewed and after reviewing the Box-Cox lambda for this variable (0.1), we determined that a log transformation was sufficient to reduce the variance of the distribution.
+
+* Correlation plot reveals positive correlations between the dependent variable totfatrte and a) perc14_24, b) unemployment rate and c) vehicmilespc.
+
+```{r ggpairs, warning = FALSE, message=FALSE, out.width="85%", fig.align="center"}
+df %>% dplyr::select(all_of(numeric_columns)) %>% ggpairs(diag=list(continuous="barDiag"))
+
+# check for skewness
+apply(df[,c("totfatrte","perc14_24", "unem", "vehicmilespc")], 2, skewness)
+```
+
+```{r unem tranform, message=FALSE, out.width="85%", fig.align="center", fig.height=3}
+## save transformed variables 
+df$unem_log <- log(df$unem)
+
+#plot
+unem_raw_plot <- ggplot(df) + geom_histogram(aes(x = unem)) + 
+  ggtitle('Unemployment Rate')
+unem_log_plot <- ggplot(df) + geom_histogram(aes(x = unem_log)) + 
+  ggtitle('Log of Unemployment Rate') + 
+  theme(plot.title = element_text(size = 10, lineheight=1))
+grid.arrange(unem_raw_plot, unem_log_plot, ncol = 2)
+```
+
+**Categorical/Binary Variables**
+
+The categorical/binary variable of interest are a) bac08, b) bac10, c) spl70plus, d) perse, e) gdl, f) sbprim, g) sbsecon and h) the US states. We examine the effect of the categorical variables using box plots. We observe that the introduction of state seatbelt and drinking laws appear to have a positive effect in reducing the fatalities. We also observe that the BAC10 and sl70plus have no/adverse impact on the fatality rates. This is misleading in the current context since the removal of BAC10 implies introduction of BAC08, and we have no data pre-dating the introduction of BAC10 law. Similarly the non-existence of a sl70plus law does not imply the non-existence of a speed law. In fact, the laws may have become stricter (sl65, sl60 etc).  
+
+```{r Categorical Feature Box Plots, echo = FALSE, message=FALSE, warning=FALSE, out.width="85%", fig.align="center"}
+df %>% dplyr::select(all_of(c(factor_columns, c('totfatrte'))), -c('state','us_state')) %>% 
+  pivot_longer(cols = c("sbprim","sbsecon", "bac08","bac10","perse","sl70plus",
+                        "gdl"), names_to = "key", values_to = "value")%>%
+   ggplot(aes(x = value, y =totfatrte)) +
+   geom_boxplot(aes(fill = value)) +
+   facet_wrap(.~key)
+```
+
+We also examine the decay curve of average total fatality rates over the years and across the states. We find that the average fatality rates have declined but at a slow rate. However, certain states (WY, NJ, MO, MT, SC) have had high fatality rates over the years, while NH, NM, ME and RI have ~3x lower fatality rates.
+
+```{r Decay Curve Plots, echo = FALSE, message=FALSE, warning=FALSE, out.width="85%", fig.align="center"}
+
+g2 <- ggplot(df, aes(x=reorder(us_state,-totfatrte), y=totfatrte)) + 
+    geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle=90)) +
+    scale_y_continuous(name = "Avg. Total Fatality Rate/year ") + labs(x='US State')
+
+g3 <- ggplot(df, aes(x=factor(year), y=totfatrte)) + 
+    geom_boxplot() + theme_bw() + theme(axis.text.x = element_text(angle=90)) +
+    scale_y_continuous(name = "Fatality Rate/year ") + labs(x='Year')
+grid.arrange(g3,g2,ncol=1)
+
+# Select States
+scale <- 1
+
+state_columns_hfr <- c("WY", "NJ", "MO", "MT", "SC")
+state_columns_lfr <- c("NH", "NM", "ME", "RI")
+
+df_hfr <- df %>% filter(us_state %in% state_columns_hfr)
+df_lfr <- df %>% filter(us_state %in% state_columns_lfr)
+
+g1 <- ggplot(df_hfr,aes(x=year, y=totfatrte, color=us_state)) + 
+    geom_line() + theme_bw() +
+    scale_y_continuous(name = "Total Fatality Rate") +
+    scale_colour_discrete(guide = 'none') +
+    # scale_x_discrete(expand=c(0, 1)) +
+    geom_dl(data = subset(df_hfr, totfatrte>30), 
+            aes(label=us_state), method = list(dl.trans(x = x - 0.2), 
+                                               "first.points", cex = 0.8)) +
+    geom_dl(data = subset(df_hfr, totfatrte<40), 
+            aes(label=us_state), method = list(dl.trans(x = x + 0.2), 
+                                               "last.points", cex = 0.8)) +
+    ggtitle('Decay curve for states with high avg fatality rates')
+g2 <- ggplot(df_lfr,aes(x=year, y=totfatrte, color=us_state)) + 
+    geom_line() + theme_bw() +
+    scale_y_continuous(name = "Total Fatality Rate") +
+    scale_colour_discrete(guide = 'none') +
+    # scale_x_discrete(expand=c(0, 1)) +
+    geom_dl(data = subset(df_lfr, totfatrte>10), 
+            aes(label=us_state), method = list(dl.trans(x = x - 0.2), 
+                                               "first.points", cex = 0.8)) +
+    geom_dl(data = subset(df_lfr, totfatrte<10), 
+            aes(label=us_state), method = list(dl.trans(x = x + 0.2), 
+                                               "last.points", cex = 0.8)) +
+    ggtitle('Decay curve for states with low avg fatality rates')
+grid.arrange(g1,g2,ncol=1)
+```
+
+### BAC08, BAC10 and Per Se laws
+
+The blood alcohol limit in most states was first introduced at the 0.1% level and then reduced to 0.08%. The years when this change was introduced are represented as fractions, i.e, a 0.333 bac08 and a 0.667 bac10 would imply that the law had changed during the end of April. This also leads to the situation where bac08 and bac10 are strongly negatively correlated. From the EDA, we find that all states had either bac08 or bac10 enforced by the end of 2004. 44 of the 48 states had fully enforced bac08 by the end of 2004, while 3 of them were getting them enforced in 2004. On the other hand, bac10 was enforced in all the states. SC, TN and MD were the last three states to implement the bac10 law. On the other side of the spectrum, OR and UT introduced the much more stricter bac08 law in 1984.
+
+```{r Intro Dates, echo = FALSE, message=FALSE, warning=FALSE, fig.height=8}
+
+plot_first_time <- function (df_plot, title) {
+  g1 <- df_plot%>% mutate(dummy=1) %>% 
+  ggplot(aes(year,dummy)) + theme_bw() + 
+  geom_jitter(position = position_jitter(seed=1)) + 
+  ggtitle(title) +
+  geom_text(position=position_jitter(seed=1), hjust=-0.1,
+            aes(label=ifelse(year>1990,as.character(us_state),''))) +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+  return(g1)
+}
+
+perse_per_state <- df %>% 
+        group_by(us_state) %>% 
+        summarise(min_perse = min(as.numeric(levels(perse)[perse])), 
+                  min_bac_08 = min(as.numeric(levels(bac08)[bac08])),
+                  min_bac_10 = min(as.numeric(levels(bac10)[bac10])),
+                  max_perse = max(as.numeric(levels(perse)[perse])), 
+                  max_bac_08 = max(as.numeric(levels(bac08)[bac08])),
+                  max_bac_10 = max(as.numeric(levels(bac10)[bac10])),
+                  min_sbprim = min(as.numeric(levels(sbprim)[sbprim])),
+                  min_sbsecon = min(as.numeric(levels(sbsecon)[sbsecon])), 
+                  max_sbprim = max(as.numeric(levels(sbprim)[sbprim])),
+                  max_sbsecon = max(as.numeric(levels(sbsecon)[sbsecon])))
+
+states_with_no_bac <- perse_per_state %>% filter(max_bac_08<1 & max_bac_10<1)
+states_with_bac08 <- perse_per_state %>% filter(max_bac_08==1)
+states_with_no_bac08 <- perse_per_state %>% filter(max_bac_08==0)
+states_with_no_perse <- perse_per_state %>% filter(max_perse<1)
+
+bac10_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(bac10==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+bac10_law_introduction_rev <- df %>% 
+        group_by(us_state) %>% filter(bac10==0) %>% filter(row_number()==1) %>%
+        arrange(year, descending=TRUE)
+bac08_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(bac08==1) %>% filter(row_number()==1) %>%
+        arrange(year, descending=FALSE)
+perse_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(perse==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+sbprim_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(sbprim==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+sbsecon_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(sbsecon==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+
+last_state_to_bac10 <- tail(bac10_law_introduction,n=1)
+
+```
+
+
+At the end of 2004, `r nrow(states_with_no_perse)` of states had no perse laws, `r  nrow(states_with_no_bac08)` had no bac 08 limits enforced, `r nrow(states_with_no_bac)` had no (either 0.08 or 0.10) bac limits enforced. The last state to enact a bac10 law was `r last_state_to_bac10$us_state` in `r last_state_to_bac10$year`.
+
+```{r Change Law Plots, echo = FALSE, warnings = FALSE,message=FALSE, warning=FALSE, fig.dim = c(6, 4), out.width="75%", fig.align="center"}
+# plot how state laws evolved over time (adoption counts)
+perse <- df %>% group_by(perse) %>% 
+  count(year) %>% filter(perse == 1) %>% 
+  as_tsibble(index = year) %>% autoplot() +
+   labs(y = "Count of States", x = "Year",
+       title = "States with Per Se \nLaws Over Time")
+
+sbprim <- df %>% group_by(sbprim) %>% 
+  count(year) %>% filter(sbprim == 1) %>% 
+  as_tsibble(index = year) %>% autoplot() +
+   labs(y = "Count of States", x = "Year",
+       title = "States with Primary \nSeatbelt Laws Over Time")
+
+bac_10 <- df %>% group_by(bac10) %>% 
+  count(year) %>% filter(bac10 == 1) %>% 
+  as_tsibble(index = year) %>% autoplot() +
+   labs(y = "Count of States", x = "Year",
+       title = "States with BAC 0.10 Laws Over Time")
+
+bac_08 <- df %>% group_by(bac08) %>% 
+  count(year) %>% filter(bac08 == 1) %>% 
+  as_tsibble(index = year) %>% autoplot() +
+   labs(y = "Count of States", x = "Year",
+       title = "States with BAC 0.08 \nLaws Over Time")
+(perse +sbprim) / (bac_10 + bac_08)
+```
+
+\section{Q2}
+
+2. (15%) How is the our dependent variable of interest *totfatrte* defined? What is the average of this variable in each of the years in the time period covered in this dataset? Estimate a linear regression model of *totfatrte* on a set of dummy variables for the years 1981 through 2004. What does this model explain? Describe what you find in this model. Did driving become safer over this period? Please provide a detailed explanation.
+
+**Answer**
+
+The *totfatrte* variable is a continuous variable that denotes the total fatalities per 100,000 population, i.e., the ratio of number of fatalities occurring over a given year to the total population of the state, multiplied with 100,000. The average fatality rate per year is given by 
+
+```{r avg-totfatrte, echo = FALSE}
+# Compute average fatality by year
+
+avg_totfatrte <- df %>% group_by(year) %>% summarise(Avg = round(mean(totfatrte),2))
+
+knitr::kable(cbind(
+  avg_totfatrte[1:5,],
+  avg_totfatrte[6:10,],
+  avg_totfatrte[11:15,],
+  avg_totfatrte[16:20,],
+  avg_totfatrte[21:25,]),col.names = NA,
+caption = "Average Total Fatality Rate", "pipe")
+```
+
+We now fit a linear regression model using year as the dummy variable. This model examines the change in total fatality rates since 1980. We find almost all of the coefficients to be statistically significant, except for year 1981. 
+
+However, results from this model should be used with caution, because the repeated observations violate the independent and identically distributed assumption for an OLS model. The Durbin-Watson test confirms the violation. 
+
+The residuals are normally distributed according to a visual observation of the qq-plots and the Breusch-Pagan test p-value is sufficiently large that we fail to reject the null hypothesis (that the residuals are homoskedastically distributed).
+
+Since, the longitudinal data presented here violate the fundamental assumptions of independence and homogeneity of variance, the estimates are not reliable and the statistics are invalid and therefore the statistical inference may be incorrect. 
+
+```{r, message=FALSE, warning=FALSE}
+lm1 <- lm(formula=totfatrte~factor(year), data=df)
+stargazer(lm1, type = "text", single.row = TRUE)
+
+# Durbin Watson 
+durbinWatsonTest(lm1)
+
+# residual plots
+par(mfrow=c(2,2))
+plot(lm1)
+# Breusch-Pagan test
+bptest(lm1)
+```
+
+The linear regression model is then given by,
+$$ totfatrte = 25.495 -1.824\delta_{1981} - 4.552\delta_{1982}... $$
+
+From the model coefficient plots (left figure), we find that the fatality rates are decreasing over the years. The rate of change of this decrease had stabilized after 1995. This is observed in the rate of change plot on the right. We see a sharp decline in fatality rates between 1985 and 1990. This coincides with the state drinking laws coming into effect in various states. In particular, the number of states that introduced the perse law over the years, shown in the plot below, reflect the decline in total fatality rates over the years. The rate of decline has saturated as the number of states with perse laws plateaued. In all 9 states had not yet introduced perse laws in 2004.  
+
+```{r, message=FALSE, warning=FALSE, out.width="85%", fig.align="center"}
+coef_model <- coef(lm1)
+coef_df <- data.frame(year=sort(unique(df$year))[2:length(coef_model)],
+                      coefs=coef_model[2:length(coef_model)])
+g1 <- ggplot(coef_df, aes(year,coefs)) + geom_line() 
+g1 <- g1 + theme_bw() + labs(x='Year', y='Change in fatality rates')
+g1 <- g1 + ggtitle('Change in fatality rates since 1980')
+temp_df <- df %>% group_by(year) %>% 
+        summarise(num_states = sum(as.numeric(levels(perse))[perse]))
+g11 <- ggplot() + geom_line(data=temp_df,aes(x=year, y=num_states))
+g11 <- g11 + theme_bw() + labs(y='Number of states with Perse laws')
+coef_df$diff_coefs <- difference(coef_df$coefs)
+g2 <- ggplot(coef_df, aes(year,diff_coefs)) + geom_line() 
+g2 <- g2 + theme_bw() + labs(x='Year', y='Rate of change in fatality rates (year-on-year)')
+g2 <- g2 + ggtitle('Change in fatality rates year-on-year') + 
+  theme(plot.title = element_text(size = 11, lineheight=1))
+
+grid.arrange(grid.arrange(g1,g11,ncol=1),g2,ncol=2)
+
+```
+
+\section{Q3}
+3. (15%) Expand your model in *Exercise 2* by adding variables *bac08, bac10, perse, sbprim, sbsecon, sl70plus, gdl, perc14_24, unem, vehicmilespc*, and perhaps *transformations of some or all of these variables*. Please explain carefully your rationale, which should be based on your EDA, behind any transformation you made. If no transformation is made, explain why transformation is not needed. How are the variables *bac8* and *bac10* defined? Interpret the coefficients on *bac8* and *bac10*. Do *per se laws* have a negative effect on the fatality rate? What about having a primary seat belt law? (Note that if a law was enacted sometime within a year the fraction of the year is recorded in place of the zero-one indicator.)
+
+We find that the skewness of the continuous variables is most observed in the 'unem' variable. A Box-Cox transform of this variable results in a $\lambda=0.1$, as described in the EDA. For low value of $\lambda$, we prefer to use a log transform for better explainability of model coefficients. Also, since the skewness of the other continuous variables are not significant, we do not transform them.
+
+In addition to violating I.I.D. assumptions like the model in Q2, this model also has heteroskedasticity in its residuals and thus we are even more skeptical of the outcomes. 
+
+As a reminder, if the law changed halfway through the year or more we consider the law as implemented in a state; otherwise we do not consider it a law. 
+
+* The coefficient for `bac08` and `bac10` indicate whether a state had a law restricting blood alcohol content for drivers and the effect of having such a law on fatality rates. Specifically, implementing a `bac08` led to a reduction of 2.04 per 100,000 people in `totfatrte` and `bac10` had a smaller impact of 0.94 per 100,000. This aligns with our intuition that more stringent requirements lead to fewer fatalities. Both were significant at 95% confidence level. 
+
+* `perse` also was significant and led to a decrease of fatalities equal to 0.7 per 100,000 people. 
+
+* `sbprim` laws did not have a statistically significant effect on `totfatrte`.
+
+Models are in [Appendix D](#AppendixD), and are reported with robust standard errors.
+
+The new linear regression model is now given by,
+$$ \begin{aligned}
+totfatrte & = & -8.01 -2.29bac08 -1.26bac10 -0.562perse -0.38sbprim \\
+& & -0.153sbsecon -3.11sl70plus -0.3gdl +0.18perse + 5.15 log(unem) + 0.0029vehicmilespc \\
+& & -2.11\delta_{1981} - 6.30\delta_{1982}... 
+\end{aligned}$$
+
+```{r, warning=FALSE}
+lm2 <- lm(formula=totfatrte ~ factor(year) + bac08 + bac10 +
+            perse + sbprim + sbsecon + sl70plus + gdl + 
+            perc14_24 + unem_log + vehicmilespc, data=df)
+
+mod_pooled <- plm(totfatrte ~ factor(year) + bac08 + bac10 +
+            perse + sbprim + sbsecon + sl70plus + gdl +
+            perc14_24 + unem_log + vehicmilespc, 
+            data=df, model='pooling', index = c("state", "year"))
+
+# residuals
+par(mfrow=c(2,2))
+plot(lm2)
+# Breusch-Pagan test
+bptest(lm2)
+
+```
+
+\section{Q4}
+
+4. (15%) Reestimate the model from *Exercise 3* using a fixed effects (at the state level) model. How do the coefficients on *bac08, bac10, perse, and sbprim* compare with the pooled OLS estimates? Which set of estimates do you think is more reliable? What assumptions are needed in each of these models?  Are these assumptions reasonable in the current context?
+
+The Pooled OLS model is equivalent to the Linear Model produced above, see [Appendix D](#AppendixD) for model summary table. 
+
+* In the pooled OLS model, `bac08` is highly statistically significant at the 95% and even 99% confidence interval, while `bac10` and `perse` show statistical significance at the 95% confidence interval. `sbprim` was not statistically significant. 
+
+* In the fixed effect model, we see a difference set of results. All four variables (`bac08, bac10, perse, and sbprim`) are statistically significant at the 99% confidence interval.
+
+**Tests**
+
+* We ran F-tests (the Chow Test) and found the p-value is significant and so we reject the null hypothesis (that the same coefficients apply across all individuals). Indicating that the Fixed Effects model is appropriate. 
+*We ran a Lagrange Multiplier Test below and the p-value is significant indicating that we should reject the null hypothesis (residuals across entities are correlated) and suspect that FE model may be more appropriate. 
+* We ran a Breusch-Godfrey test for serial correlation and found the p-value is significant so we reject the null hypothesis (that there is no serial correlation), and conclude the FE model is more appropriate.
+
+**FE model**
+
+The FE model is indicated based on the tests above.  
+
+Based on the findings in Q3, the unobserved effect is correlated with the explanatory variables and so the pooled OLS / linear models result in biased and inconsistent estimates. The pooled effect model assumes that the independent variables are uncorrelated with the error term. The FE model removes the unobserved effect and leads to more robust and reliable estimates, because it assumes that the independent variables are correlated with the error term. 
+
+The FE model is then defined by,
+
+$$
+totfatrte_{it} = \beta_1 X_{1,it} + \cdots + \beta_k X_{k,it} + \alpha_i + u_{it}
+$$
+where,
+$$X \in \{bac08,bac10, perse,sbprim,sbsecon,sl70plus,gdl,perc14\_24,log(unem), vehicmilespc\}$$
+
+and $\alpha_i$ are the time-invariant unobserved effects observed for each state $i$, $t \in [1980, 2004]$, $u_{it}$ are the errors, and $X$ are the explanatory variables.
+
+Note: In our `robust_se` function, we use `arellano` in our `vcovHC` parameter because we have both heteroskedasticity and serial correlation. We also use `HC3` in our `type` parameter because it gives less weight to outliers.
+
+```{r out.width="85%", fig.align="center", warning = FALSE, message=FALSE}
+
+# F-test / Chow Test
+fixed_effects_mod.time <- pvcm(totfatrte ~  bac08 + bac10 +
+  perse + sbprim + sbsecon + sl70plus + gdl +
+  perc14_24 + unem_log + vehicmilespc, data=df, model="within",
+            index = c("state", "year"))
+
+fixed_effects_mod <- plm(totfatrte ~ bac08 + bac10 +
+  perse + sbprim + sbsecon + sl70plus + gdl +
+  perc14_24 + unem_log + vehicmilespc, data=df, model="within",
+            index = c("state", "year"))
+
+pooltest(fixed_effects_mod, fixed_effects_mod.time) 
+
+# Lagrange Multiplier Test
+plmtest(fixed_effects_mod, c("time"), type=("bp"))
+
+# Serial Correlation
+pbgtest(fixed_effects_mod )
+
+# FE model
+mod_fe <- plm(totfatrte ~ factor(year) + bac08 + bac10 +
+            perse + sbprim + sbsecon + sl70plus + gdl +
+            perc14_24 + unem_log + vehicmilespc,
+                  data=df, model='within', index = c("state", "year"))
+
+summary(mod_fe, vcov=vcovHC(mod_fe, method="arellano", type="HC3"))
+```
+
+\section{Q5}
+
+5. (10%) Would you prefer to use a random effects model instead of the fixed effects model you built in *Exercise 4*? Please explain.
+
+In theory the random effects model allows for time invariant explanatory variables to be included in our model. A fixed effect model eliminates all time invariant variables. However, RE assumes that the unobserved effect is uncorrelated with all explanatory variables in all time periods, and that's difficult to believe in a case where state-level differences are likely to exist. 
+
+We also run the Hausman test to make sure that the fixed effects model is preferable over the random effect model (below). Since we generate a small p-value, we reject the null hypothesis (that unique errors are correlated with regressors) and we should use the fixed effects model.
+
+
+$$
+totfatrte_{it} =  \beta_0 + \beta_1X_{1,it} +\cdots+  \beta_kX_{k,it}+a_i +u_{it},\
+$$
+where $i$ is the state, $a_i$ is the unobserved effect uncorrelated with all explanatory variables $X$, and $t \in [1980,2004]$.
+
+```{r out.width="85%", fig.align="center", warning = FALSE,  message=FALSE}
+# random effects model
+mod_re <- plm(totfatrte ~ factor(year) + bac08 + bac10 +
+            perse + sbprim + sbsecon + sl70plus + gdl + 
+            perc14_24 + unem_log + vehicmilespc, data=df, model="random", 
+            index = c("state", "year"))
+
+summary(mod_re, vcov=vcovHC(mod_re, method="arellano", type="HC3"))
+# Hausman
+phtest(mod_fe, mod_re)
+```
+
+As stated above, since the fixed effect model assumptions are more reasonable than the random effect model assumptions, we would opt to use the fixed effect model. Some examples of how the error term could be correlated with the independent variables include:
+
+- Difference of income / cost of living between different states (e.g. higher cost of living in CA/NY vs. Midwest)
+- Different political and cultural preferences between residents in different states
+
+\section{Q6}
+6. (10%) Suppose that *vehicmilespc*, the number of miles driven per capita, increases by $1,000$. Using the FE estimates, what is the estimated effect on *totfatrte*? Please interpret the estimate.
+
+```{r}
+fe_robust_coef <- coef(mod_fe, vcovHC(mod, method = "arellano", type= "HC3"))
+```
+
+The increase in fatalities per 100,000 people would be `r round(fe_robust_coef[34]*1000,3)`. We apply a robust standard error to estimate our coefficient of interest.
+
+\section{Q7}
+7. (5%) If there is serial correlation or heteroskedasticity in the idiosyncratic errors of the model, what would be the consequences on the estimators and their standard errors?
+
+The estimators would be incorrect likely due to an overly optimistic standard error. In our models, we applied robust standard errors in order to adjust our estimates. 
+
+\section{Appendix}
+
+## Appendix A: Glossary {#AppendixA}
+
+### Laws per state
+**Speed limit Laws**
+
+* sl55, sl65, sl70, sl75: *(Binary)* An imposed speed limit of 55, 65, 70 and 75mph, respectively. 
+
+* slnone: *(Binary)* No imposed speed limit
+
+* sl70plus: *(Binary)* sl70 + sl75 + slnone
+
+**Seat Belt Laws**
+
+* seatbelt: *(Binary)* =0 if none, =1 if primary, =2 if secondary
+
+* sbprim: *(Binary)* =1 if primary seatbelt law
+
+* sbsecon: *(Binary)* =1 if secondary seatbelt law
+
+**Drinking Laws**
+
+* minage: *(Continuous)* State level imposition of minimum drinking age (years)
+
+* zerotol: *(Binary)* Zero tolerance laws make it illegal for drivers under age 21 to drive with any measurable amount of alcohol in their system, regardless of the BAC limit for older drivers.
+
+* gdl: *(Binary)* Graduated Driver Licensing (GDL) programs allow young drivers to safely gain driving experience before obtaining full driving privileges. Different states have differing versions of the law implemented based off minimum age requirements for graduating through the phases of the learner programs.
+
+* bac10: *(Binary)* Blood Alcohol Concentration (BAC) legal limit set to .10%. This preceded the bac08 law.
+
+* bac08: *(Binary)* Blood Alcohol Concentration (BAC) legal limit set to .08%, at which driving skills are proven to be compromised.
+
+* perse: *(Binary)* administrative license revocation (ALR), An ALR law gives state officials the authority to suspend administratively the license of any driver who fails or refuses to take a BAC test.
+
+### Fatality Statistics per state
+
+* totfat: *(Continuous)* total traffic fatalities
+
+* nghtfat: *(Continuous)* total nighttime fatalities
+
+* wkndfat: *(Continuous)* total weekend fatalities
+
+* totfatpvm: *(Continuous)* total fatalities per 100 million miles
+
+* nghtfatpvm: *(Continuous)* nighttime fatalities per 100 million miles
+
+* wkndfatpvm: *(Continuous)* weekend fatalities per 100 million miles
+
+* totfatrte: *(Continuous)* total fatalities per 100,000 population
+
+* nghtfatrte: *(Continuous)* nighttime fatalities per 100,000 population
+
+* wkndfatrte: *(Continuous)* weekend accidents per 100,000 population
+
+### Demographics
+
+* year: *(Continuous)* 1980 through 2004
+
+* state: *(Categorical*) 48 continental states, alphabetical
+
+* statepop: *(Continuous)* state population
+
+* vehicmiles: *(Continuous)* vehicle miles traveled, billions
+
+* unem: *(Continuous)* unemployment rate, percent
+
+* perc14_24: *(Continuous)* percent population aged 14 through 24
+
+* vehicmilespc: *(Continuous)* the number of miles driven per capita
+
+### Dummy Variables
+
+* d80 to d04: *(Binary)* One hot encoded features for years 1980 to 2004
+
+
+# Appendix B: More EDA {#AppendixB}
+
+```{r}
+#skimr::skim(df)
+```
+
+```{r transformation details, echo=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+
+# chart without and with transformations
+plot_wo_transforms <- df %>% 
+  dplyr::select(totfatrte, perc14_24, unem, vehicmilespc) %>% 
+  pivot_longer(cols = c("totfatrte","perc14_24", "unem", "vehicmilespc"),
+                names_to = "key", values_to = "values") %>%
+  #necessary to keep order of items
+  mutate(key = factor(key, levels = c("totfatrte","perc14_24", "unem", "vehicmilespc"))) %>%
+  ggplot(aes(x = values)) +  geom_histogram()  + 
+  ggtitle('Variables without transforms') +
+  facet_wrap(key ~ ., scales = "free_x", ncol = 4) 
+
+# identify whether Box-Cox or log transform are appropriate
+apply(df[, (names(df) %in% c("totfatrte","perc14_24", "unem",
+                             "vehicmilespc"))], 2, BoxCoxTrans)
+```
+
+```{r}
+
+g1 <- df %>% 
+        group_by(us_state) %>% 
+        summarise(totfatrte_avg = mean(totfatrte)) %>%
+        ggplot() + geom_bar(aes(x=reorder(us_state,-totfatrte_avg), y=totfatrte_avg), 
+                            stat='identity') + theme_bw() + 
+        theme(axis.text.x = element_text(angle=90))  + 
+        ggtitle('Average Fatality Rate Per State') + 
+  labs(x='US state',y='Average Fatality Rate')
+
+g2 <- df %>% 
+        group_by(year) %>% 
+        summarise(totfatrte_avg = mean(totfatrte)) %>%
+        ggplot() + geom_bar(aes(x=year, y=totfatrte_avg), stat='identity') + 
+        theme_bw() + theme(axis.text.x = element_text(angle=90)) + 
+        ggtitle('Average Fatality Rate Per Year') + 
+  labs(x='US state',y='Average Fatality Rate')
+
+grid.arrange(g1,g2, ncol=1)
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+#CORRELATION PLOT
+temp_df <- df %>% dplyr::select(all_of(numeric_columns)) %>% as_tibble()
+corr <- round(cor(temp_df),1)
+ggcorrplot(corr, hc.order = TRUE, #type = "lower",
+   lab = TRUE)
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.height=8}
+plot_first_time <- function (df_plot, title) {
+  g1 <- df_plot%>% mutate(dummy=1) %>% 
+  ggplot(aes(year,dummy)) + theme_bw() + 
+  geom_jitter(position = position_jitter(seed=1)) + 
+  ggtitle(title) +
+  geom_text(position=position_jitter(seed=1), hjust=-0.1,
+            aes(label=ifelse(year>1990,as.character(us_state),''))) +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+  return(g1)
+}
+
+perse_per_state <- df %>% 
+        group_by(us_state) %>% 
+        summarise(min_perse = min(as.numeric(levels(perse)[perse])), 
+                  min_bac_08 = min(as.numeric(levels(bac08)[bac08])),
+                  min_bac_10 = min(as.numeric(levels(bac10)[bac10])),
+                  max_perse = max(as.numeric(levels(perse)[perse])), 
+                  max_bac_08 = max(as.numeric(levels(bac08)[bac08])),
+                  max_bac_10 = max(as.numeric(levels(bac10)[bac10])),
+                  min_sbprim = min(as.numeric(levels(sbprim)[sbprim])),
+                  min_sbsecon = min(as.numeric(levels(sbsecon)[sbsecon])), 
+                  max_sbprim = max(as.numeric(levels(sbprim)[sbprim])),
+                  max_sbsecon = max(as.numeric(levels(sbsecon)[sbsecon])))#,
+                  # range_perse = max(as.numeric(perse))-min(as.numeric(perse)), 
+                  # range_bac_08 = max(as.numeric(bac08))-min(as.numeric(bac08)),
+                  # range_bac_10 = max(as.numeric(bac10))-min(as.numeric(bac10)))
+
+states_with_no_bac <- perse_per_state %>% filter(max_bac_08<1 & max_bac_10<1)
+states_with_bac08 <- perse_per_state %>% filter(max_bac_08==1)
+states_with_no_bac08 <- perse_per_state %>% filter(max_bac_08==0)
+states_with_no_perse <- perse_per_state %>% filter(max_perse<1)
+
+print(paste('The number of states that had no bac limits enforced (1980-2004):',
+            nrow(states_with_no_bac)))
+print(paste('The number of states that had bac 08 limits enforced (1980-2004):',
+            nrow(states_with_bac08)))
+print(paste('The number of states that had no bac 08 limits enforced (1980-2004):',
+            nrow(states_with_no_bac08)))
+print(paste('The number of states that had no perse laws (1980-2004):',
+            nrow(states_with_no_perse)))
+
+bac10_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(bac10==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+bac10_law_introduction_rev <- df %>% 
+        group_by(us_state) %>% filter(bac10==0) %>% filter(row_number()==1) %>%
+        arrange(year, descending=TRUE)
+bac08_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(bac08==1) %>% filter(row_number()==1) %>%
+        arrange(year, descending=FALSE)
+perse_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(perse==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+sbprim_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(sbprim==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+sbsecon_law_introduction <- df %>% 
+        group_by(us_state) %>% filter(sbsecon==1) %>% filter(row_number()==1) %>%
+        arrange(year)
+
+last_state_to_bac10 <- tail(bac10_law_introduction,n=1)
+print(paste('The last state to enact a bac10 law was: ', 
+            last_state_to_bac10$us_state, ' in the year: ', 
+            last_state_to_bac10$year), max.levels=0)
+
+g1 <- bac10_law_introduction %>% mutate(dummy=1) %>% 
+  ggplot(aes(year,dummy)) + theme_bw() + 
+  geom_jitter(position = position_jitter(seed=1)) + 
+  ggtitle('Year of BAC10 introduction') +
+  geom_text(position=position_jitter(seed=1), hjust=-0.1,
+            aes(label=ifelse(year>1990,as.character(us_state),''))) +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+g2 <- bac08_law_introduction %>% mutate(dummy=1) %>% 
+  ggplot(aes(year,dummy)) + theme_bw() + 
+  geom_jitter(position = position_jitter(seed=1)) + 
+  ggtitle('Year of BAC08 introduction') +
+  geom_text(position=position_jitter(seed=1), hjust=-0.1,
+            aes(label=ifelse(year<1990,as.character(us_state),''))) +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+g3 <- perse_law_introduction %>% mutate(dummy=1) %>% 
+  ggplot(aes(year,dummy)) + theme_bw() + 
+  geom_jitter(position = position_jitter(seed=1)) + 
+  ggtitle('Year of PerSe introduction') +
+  geom_text(position=position_jitter(seed=1), hjust=-0.1,
+            aes(label=ifelse(year>1990,as.character(us_state),''))) +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+g4 <- sbprim_law_introduction %>% mutate(dummy=1) %>%
+  ggplot(aes(year,dummy)) + theme_bw() +
+  geom_jitter(position = position_jitter(seed=1)) +
+  ggtitle('Year of sbprim introduction') +
+  geom_text(position=position_jitter(seed=1), hjust=-0.1,
+            aes(label=ifelse(year>1990,as.character(us_state),''))) +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+g5 <- plot_first_time(sbsecon_law_introduction, 'Year of sbsecon introduction')
+grid.arrange(g1,g2,g3,g4,g5,ncol=1)
+
+```
+
+# Appendix C: Code for this report {#AppendixC}
+
+```{r getlabels, echo = FALSE}
+labs = knitr::all_labels()
+labs = labs[labs %in% c("setup", "box-cox plots", "State names", "Categorical Feature Box Plots", "avg-totfatrte", "Intro Dates","Map Plots", "Decay Curve Plots", "Change Law Plots")]
+```
+
+```{r allcode, ref.label = labs, eval = TRUE}
+```
+
+
+# Appendix D: Pooled OLS and Linear Regression {#AppendixD}
+
+```{r, warnings = FALSE}
+stargazer(lm2, mod_fe, mod_re, 
+          se.list = list(robust_se(lm2),
+                         robust_se(mod_fe),
+                         robust_se(mod_re)), 
+          notes = "Robust Standard Errors",
+          column.labels = c("OLS", "Fixed Effects", "Random Effects"),
+          type = "text",
+          single.row = TRUE)
+```
+
+

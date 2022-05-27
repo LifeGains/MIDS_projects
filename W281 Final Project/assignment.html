@@ -1,0 +1,142 @@
+<!-- #######  Assignment description #########-->
+<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+<h1 style="color: #5e9ca0;"> <img style="float: left;" src="images/ucbseal_139_540.png" 
+    alt="UCB logo" width="45" /> Computer Vision (MIDS Spring 2021)</h1>
+<p></p>
+<h1 style="color: #2b2301;">Final Project </h1>
+
+<img src="images/teaser.png" width=500px>
+
+ <br>
+  <h3>Overview</h3>
+  
+  <p> This project will consist of a large dataset including images from
+    20 different categories. Your task is to identify key distinguishing 
+    features of these images and
+    develop models to classify them in Python. To successfully 
+    train a classifier we need to do 
+     data cleaning, feature exploration, 
+    model parameter selection, and model selection. 
+    In this project, you will do all of these steps. 
+    You will extract different image features, 
+    visualize those features, train several models, and 
+    explain the process in a report. Most of the concepts, 
+    like feature extraction and visualization, 
+    are already taught in the class. The classification techniques will 
+    be covered soon. We recommend that you start working 
+    on the project as early as possible. 
+  </p>
+
+<h3>Description</h3>
+
+  <ol>
+      
+      <li style="margin-bottom:2em"><b>Feature Extraction:</b>
+        The first step for a classification task is identifying 
+        discriminative features. 
+        For this, you can use simple features like image intensity 
+        or you can extract more sophisticated features like 
+        the convolutional neural network (CNN) based features. 
+        Additionally, you can use 
+        either a single channel or all three color channels for 
+        feature computation (image color can sometimes provide an additional 
+        cue for classification). 
+        Write separate Python functions to extract 
+        each of the following image 
+        features given an RGB image as input: 
+        <ol>
+          <li> Histogram of Oriented Gradients (HOG): This is the 
+            feature you learned in the class. You can use Python's 
+          sklearn library for extracting this feature. 
+          In your report, 
+          include plot(s) 
+        visualizing the HOG features for an image and 
+        explain how you decided 
+      the size of the window for HOG computation. </li>
+          <li> Harris Corner Features: As you learned during motion estimation, 
+            image corners are robust features for tracking. One way to detect 
+            corners is by using an algorithm by Chris Harris & Mike Stephens, 
+            Harris corner detector (suggested 
+            <a href="https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_features_harris/py_features_harris.html#harris-corners">reading</a>).
+            Again, you can use Python's sklearn or OpenCV implementation of Harris 
+            Corner detection algorithms. In your report, include plot(s) 
+            visualizing these features for an image and explain how you selected 
+            different parameters for the detector. 
+          </li>
+          <li> Two features of your choice: Implement two additional features of 
+            your choice which can help in the classification task. These features can 
+            be as simple as image intensity or state-of-the-art image 
+            classification features extracted using 
+            a CNN pre-trained on ImageNet. 
+            In your report, 
+            include plot(s) in order to explain the features 
+            you implemented and why you selected these features. 
+
+          </li>
+        </ol>
+        
+      </li>
+
+      <li style="margin-bottom:2em"><b>Feature Visualization:</b>
+        Load the images given <a href="20_categories_training.zip">here</a>. 
+        The images are divided into 20 categoreis. 
+        Visualize the above features for these images on 2-D plots. 
+        As these features are 
+        high dimensional, you will need to reduce the dimensionality of 
+        these features. Remember PCA and t-SNE for dimensionality reduction. 
+        You can use any of these dimensionality reduction techniques 
+        for visualizing the features on a 2-D plot. You can use only a small 
+         set of images from each of the 20 categories. Use Python's 
+        sklearn library for t-SNE or PCA. 
+        In the 2-D plot, 
+        use different colors to represent images 
+        from different categories.
+        In your report, include plot(s) to show the visualization of the features 
+        (you can also use combination of multiple features) on 2-D plot. Explain 
+        which features and dimensionality reduction technique 
+        you used for the plots and why. Also, explain if there is anything 
+        interesting you observed while exploring the features. 
+      </li>
+
+      <li style="margin-bottom:2em"><b>Image Classification:</b>
+        Split the images from each category into training and validation dataset. 
+        Generally, it is done by randomly selecting 80% images from 
+        each class for training and 20% for validation. You will 
+        train the models using training data, 
+        tune the hyper-parameters for the classifiers using 
+        validation dataset. You will train multiple classification models here. 
+        For each classification model, 
+        you can use sklearn library 
+        functions. Use the following classification techniques that you learned 
+        in the class using the features you implemented above: 
+        Logistic Regression, nearest-neighbor clustering, 
+        SVM, and CNN (optional). Use the validation set 
+        to compute the 
+        accuracy throughout the process, with and without different features,
+        optimizing as much as possible. Use tricks like cross-validation and 
+        hyper-parameter tuning to ensure your model is generalizing to 
+        validation dataset.
+          
+      </li>
+
+    <li>Run the model of your choice 
+      (that gives the best accuracy on the validation data) on the test data 
+      given <a href=20_test.zip>here</a>. Generate a csv of
+      classification results for all the images. The csv will have 
+      two columns: name and label that specify the image name and 
+      the output class label. Include this csv in your 
+    submission.</li>
+
+  </ol>
+
+<h3>Deliverables</h3>
+
+<p>You will submit your code, classification results on 
+  test data, and a report. 
+  In the report (maximum three pages), 
+  you will explain the process and things you learned in the 
+  project. 
+  You will be graded on the correctness of the code, 
+  clarity of your report, and your model accuracy on the test data. </p>
+
+

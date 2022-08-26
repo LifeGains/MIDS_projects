@@ -8,7 +8,7 @@ Results/Model: 55-60% Accuracy: XGBoost
 
 Tools: Python, SQL / Amazon AWS (EC2, S3) / XGBoost, Random Forest
 
-## W207 Introduction to Machine Learning: Stock Prediction Model								
+## W207 Applied Machine Learning: Stock Prediction Model								
 Create a stock prediction model that maximizes both prediction accuracy and returns (“utility score”)
 
 Results/Model: 52% Accuracy: Naive Bayes
@@ -22,7 +22,7 @@ Results/Model: 84% Recall: Random Forest (% of delayed flights that are correctl
 
 Tools: Python / Databricks / Random Forest, Gradient Boosted Trees, Logistic Regression
 
-## W266 Natural Language Processing (NLP): Subreddit Classification, Github								
+## W266 Natural Language Processing (NLP) with Deep Learning: Subreddit Classification, Github								
 Accurately classify slang-heavy social media posts (using NLP techniques) in order to attract higher ad spending
 
 Hypothesis: Classification of deslanged social media posts will outperform those with slang/acronyms

@@ -2,11 +2,13 @@
 Repo for all MIDS projects.
 
 ## W210 Capstone: StockpickAI
-Predicts which 5 stocks (on a monthly basis) are the most likely to outperform the S&P 500 over the next year.
+Recommends 5 stocks (on a monthly basis) that are the most likely to outperform the S&P 500 over the next calendar year.
 
-Results/Model: 55-60% Accuracy: XGBoost
+Results/Model: 55-60% Accuracy: XGBoost / +19.9% annualized vs. +8.9% S&P 500 (2004-2022)
 
 Tools: Python, SQL / Amazon AWS (EC2, S3) / XGBoost, Random Forest
+
+One of Eight Showcase Finalists for the Hal Varian Award
 
 ## W207 Applied Machine Learning: Stock Prediction Model								
 Create a stock prediction model that maximizes both prediction accuracy and returns (“utility score”)

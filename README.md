@@ -1,4 +1,4 @@
-# UC Berkeley Masters of Information and Data Science - Projects
+# Kevin Fu: UC Berkeley Masters of Information and Data Science - All Projects
 Repo for all MIDS projects.
 
 ## W210 Capstone: StockpickAI

@@ -18,6 +18,10 @@
 
 
 ## Challenges
+- Deslanging. finding an accurately labeled, large sized slang dictionary was a difficult task. We wanted synonyms as definitions as opposed to sentences.
+  - Solution: Found one that had 6000 slang words and their respective synonyms/ definitions.
+- There were a ton of duplicates or errorneous/ outdated synonyms/ definitions in our dictionary, but we couldn’t find a better/ free one. 
+  - Solution: Divide and conquer. We went in manually and changed them ourselves.
 
 
 ## Interesting Findings

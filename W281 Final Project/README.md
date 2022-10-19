@@ -18,4 +18,4 @@
   - Solution: Find and create as many training images as I could with edge detection, random flipping/ scaling/ zooming. Or we would simply use ResNet in real life image classification applications and build on top of it.
 
 ## Interesting Findings
--	Even the CNN did not do so well (46% vs. 80%+ was what I expected). SVM, Logistic regression, and KNN were the models we were supposed to use to optimize. I tried CNN just to see what was possible, and it was only 15% better, which is definitely a large jump, but still not better than a coin flip.  
+-	Even the CNN did not do so well (46% vs. 80%+ was what I expected). SVM, Logistic regression, and KNN were the models we were supposed to use to optimize. I tried CNN just to see what was possible, and it was only 15% better vs. SVM, which is definitely a large jump, but still not better than a coin flip.  

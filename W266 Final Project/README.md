@@ -25,4 +25,4 @@
 
 
 ## Interesting Findings
-
+-	As stated above, the deslanged models unexpectedly underperformed the slang models. The BERT models is too powerful out of the box.

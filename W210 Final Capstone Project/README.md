@@ -1,3 +1,5 @@
+# W210: StockPickAI
+
 ## Goal:
 - ML enabled stock picking system for retail investor.
 - Retail investors do not have access to ML-driven quant funds in current day and age. Minimum = 100K, 1M+ to get access to quant funds, or are just closed to outsiders. Our platform is a ML driven stock selection solution for retail investors for a very low minimum.

@@ -1,4 +1,4 @@
-# W266: Flight Delay Prediction
+# W261: Flight Delay Prediction
 
 ## Goal
 - Predict flight delays for 4 reasons:

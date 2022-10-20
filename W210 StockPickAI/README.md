@@ -8,7 +8,7 @@
 - Due to expertise in finance, I spearheaded feature engineering/ selection/ creation portion. 50 out of 130 features were significant. We used PCA & SHAP to narrow down number of features.
 
 ## Impact:
-- Accuracy was low 55-60% with XGBoost + Gridsearch. However, despite low accuracy, the winning picks outperformed the losing picks. Over roughly 20 years (2003-2022), we outperformed the SPX by 2x.
+- Accuracy was low 55-60% with XGBoost + Gridsearch. However, despite low accuracy, the winning picks outperformed the losing picks. Over roughly 20 years (2004-2022), we outperformed the SPX by 2x.
 
 ## Challenges:
 - Obtaining data with enough history was a challenge. Could not combine multiple different sources because different tags, ways of calculating features. 
